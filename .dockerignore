@@ -1,0 +1,29 @@
+# Old exploratory scripts/assets from before the app existed — not part of the deploy
+*.mp4
+*.jpg
+*.zip
+*.pt
+dummy.py
+test_smooth.py
+wireframe.py
+wireframe_clubhead.py
+wireframe_trail.py
+golf_pose_inference.py
+main.py
+videos_160/
+videos_160_output/
+
+# Local runtime data (recreated at container start; never bake real data into an image)
+backend/data/
+
+# Dependency/build artifacts (installed fresh inside the image)
+frontend/node_modules/
+frontend/dist/
+backend/__pycache__/
+backend/app/__pycache__/
+**/__pycache__/
+*.pyc
+
+# VCS/editor
+.git/
+.gitignore

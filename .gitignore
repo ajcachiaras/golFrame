@@ -1,0 +1,33 @@
+# Old exploratory scripts/assets from before the app existed
+*.mp4
+*.jpg
+*.zip
+*.pt
+/dummy.py
+/test_smooth.py
+/wireframe.py
+/wireframe_clubhead.py
+/wireframe_trail.py
+/golf_pose_inference.py
+/main.py
+/videos_160/
+/videos_160_output/
+
+# Runtime data (personal swing videos, DB, downloaded model weights) — never commit
+backend/data/
+backend/*.log
+
+# Dependencies / build artifacts (regenerated via npm ci / pip install)
+frontend/node_modules/
+frontend/dist/
+__pycache__/
+**/__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Editor/OS
+.DS_Store
+
+# Claude Code local session/tooling state — not part of the app
+.claude/

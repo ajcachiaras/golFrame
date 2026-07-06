@@ -1,0 +1,122 @@
+.detail-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 380px) 1fr;
+  gap: 28px;
+  align-items: start;
+}
+
+@media (max-width: 760px) {
+  .detail-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.detail-video video {
+  width: 100%;
+  border-radius: 10px;
+  background: #000;
+}
+
+.kinematic-section {
+  grid-column: 1 / -1;
+  margin-top: 8px;
+}
+
+.playback-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.speed-control,
+.step-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 12px;
+}
+
+.speed-control button,
+.step-control button {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--text-h);
+}
+
+.speed-control button.active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.keyframe-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.keyframe-chip.not-detected {
+  opacity: 0.6;
+}
+
+.keyframe-chip {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--text-h);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.keyframe-chip .name {
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 11px;
+}
+
+.keyframe-chip input {
+  width: 60px;
+  font-size: 12px;
+  text-align: center;
+}
+
+.top-actions {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.top-actions button {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+  color: var(--text-h);
+}
+
+.caveat {
+  font-size: 13px;
+  background: var(--accent-bg);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  color: var(--text-h);
+}
+
+.metric-note {
+  font-size: 12px;
+  opacity: 0.8;
+}

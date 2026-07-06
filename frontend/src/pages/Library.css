@@ -1,0 +1,138 @@
+.library-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.dropzone {
+  border: 2px dashed var(--border);
+  border-radius: 10px;
+  padding: 24px;
+  text-align: center;
+  cursor: pointer;
+  color: var(--text);
+  min-width: 260px;
+}
+
+.dropzone.dragging {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+}
+
+.dropzone input {
+  display: none;
+}
+
+.swing-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 18px;
+}
+
+.swing-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  text-decoration: none;
+  color: inherit;
+  position: relative;
+}
+
+.swing-card .thumb {
+  aspect-ratio: 9 / 16;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #999;
+  font-size: 13px;
+  overflow: hidden;
+}
+
+.swing-card .thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.swing-card .body {
+  padding: 10px 12px;
+}
+
+.swing-card .filename {
+  font-weight: 600;
+  color: var(--text-h);
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.swing-card .date {
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+.badge-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.badge {
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: var(--accent-bg);
+  color: var(--text-h);
+}
+
+.badge.error {
+  background: rgba(208, 52, 44, 0.15);
+  color: var(--bad);
+}
+
+.star-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(0, 0, 0, 0.5);
+  border: none;
+  border-radius: 6px;
+  color: #fff;
+  cursor: pointer;
+  font-size: 15px;
+  padding: 4px 6px;
+  line-height: 1;
+}
+
+.star-btn.active {
+  color: #ffd54a;
+}
+
+.delete-btn {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  background: rgba(0, 0, 0, 0.5);
+  border: none;
+  border-radius: 6px;
+  color: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 4px 7px;
+  line-height: 1;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text);
+}
