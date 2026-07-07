@@ -24,6 +24,8 @@ backend/app/__pycache__/
 **/__pycache__/
 *.pyc
 
-# VCS/editor
+# VCS/editor/CI (not needed inside the image itself)
 .git/
 .gitignore
+.github/
+DEPLOYMENT.md
