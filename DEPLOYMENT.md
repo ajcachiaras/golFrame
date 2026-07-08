@@ -210,7 +210,19 @@ options, same tradeoff as any AWS setup like this:
 2. Visibility: **Private**. Name: `golframe`.
 3. Everything else default → **Create repository**.
 
-## 6. Set up the GitHub Actions workflow
+## 6. Create the ECS cluster
+
+The deploy action creates/updates the Express *service* on each run, but expects the *cluster* to
+already exist — it won't create one for you.
+
+1. **AWS Console → ECS → Clusters → Create cluster**.
+2. Cluster name: `golframe` (must match exactly — this is what the workflow's `ECS_CLUSTER` env var
+   passes in).
+3. Infrastructure: **AWS Fargate (serverless)** — no EC2 instances needed.
+4. Everything else default → **Create**. An empty Fargate cluster costs nothing until tasks
+   actually run in it.
+
+## 7. Set up the GitHub Actions workflow
 
 The workflow file is already in the repo at `.github/workflows/deploy.yml` and doesn't need any
 edits — the region/cluster/service names in it already match this doc. You just need to add
@@ -233,10 +245,10 @@ image, pushes it to ECR, and creates the Express service on its first run (updat
 after that). Watch the run under the **Actions** tab — the last step's output includes the
 service's public endpoint URL once it succeeds.
 
-## 7. First real check
+## 8. First real check
 
 Once deployed: open the endpoint URL from the Actions log, log in with the Basic Auth credentials
-from step 6, and upload a real swing clip. If something goes wrong, check the GitHub Actions run
+from step 7, and upload a real swing clip. If something goes wrong, check the GitHub Actions run
 log first (build/push failures show up there), then the ECS service's **Logs** tab in the AWS
 Console (CloudWatch) for anything that fails after the container starts — that's the same
 stdout/stderr you'd see running `uvicorn` locally.
