@@ -25,7 +25,7 @@ what does that building (on GitHub's own servers — nothing needs to build on y
 - This repo is already pushed to [ajcachiaras/golFrame](https://github.com/ajcachiaras/golFrame).
 - Your Roboflow API key (the one already in use locally).
 - Pick one AWS region and use it everywhere below (top-right region switcher in the console) — this
-  doc uses `us-east-1` as the example.
+  project uses `us-west-1`.
 - Your **AWS account ID** (12 digits) — shown top-right in the console under your account name, or
   on the IAM dashboard's summary. You'll paste this into a couple of JSON snippets below.
 
