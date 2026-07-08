@@ -2,7 +2,8 @@
 
 This is the step-by-step for taking the app from local-only to a live site on AWS: S3 for
 video/thumbnail/keypoints storage, RDS Postgres for the database, and **Amazon ECS Express Mode**
-for compute, all in one AWS account.
+for compute, all in one AWS account. Everything below is done through the AWS Console — no AWS CLI
+needed.
 
 > **Why ECS Express Mode and not App Runner?** App Runner stopped accepting new customers on
 > April 30, 2026. AWS's own recommended replacement is ECS Express Mode — a newer feature inside
@@ -16,16 +17,17 @@ Deploys happen via a GitHub Actions workflow (already added at `.github/workflow
 every push to `main` builds the Docker image, pushes it to ECR, and updates the ECS Express
 service. This replaces App Runner's "connect a GitHub repo and it builds for you" — Express Mode
 deploys from a container image rather than building from your repo directly, so GitHub Actions is
-what does that building.
+what does that building (on GitHub's own servers — nothing needs to build on your machine either).
 
 ## 0. Prerequisites
 
-- An AWS account, with the [AWS CLI](https://aws.amazon.com/cli/) installed and configured
-  (`aws configure`) — most of the one-time IAM setup below is easiest via CLI commands you can just
-  copy-paste.
+- An AWS account.
 - This repo is already pushed to [ajcachiaras/golFrame](https://github.com/ajcachiaras/golFrame).
 - Your Roboflow API key (the one already in use locally).
-- Pick one AWS region and use it everywhere below — this doc uses `us-east-1` as the example.
+- Pick one AWS region and use it everywhere below (top-right region switcher in the console) — this
+  doc uses `us-east-1` as the example.
+- Your **AWS account ID** (12 digits) — shown top-right in the console under your account name, or
+  on the IAM dashboard's summary. You'll paste this into a couple of JSON snippets below.
 
 ## 1. Create the S3 bucket
 
@@ -52,85 +54,93 @@ what does that building.
 ## 3. Create the IAM roles
 
 ECS Express Mode uses three separate roles, plus a fourth for GitHub Actions itself to be able to
-deploy. Run these with the AWS CLI (swap in your account ID, bucket name, and region).
+deploy. All four follow the same console pattern: create a permissions policy first (if it's a
+custom one, not an AWS-provided one), then create the role and attach it.
 
-**a) Task execution role** (standard ECS role — lets the ECS agent pull the image from ECR and
-write logs; nothing app-specific):
-```bash
-aws iam create-role --role-name golframe-ecs-execution-role \
-  --assume-role-policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"ecs-tasks.amazonaws.com"},"Action":"sts:AssumeRole"}]}'
-aws iam attach-role-policy --role-name golframe-ecs-execution-role \
-  --policy-arn arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
-```
+### a) Task execution role
+Standard ECS role — lets the ECS agent pull the image from ECR and write logs; nothing
+app-specific, no custom policy needed.
 
-**b) Infrastructure role** (Express-Mode-specific — lets ECS provision the load balancer, security
-groups, SSL cert, and autoscaling on your behalf):
-```bash
-aws iam create-role --role-name golframe-ecs-infrastructure-role \
-  --assume-role-policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"ecs.amazonaws.com"},"Action":"sts:AssumeRole"}]}'
-aws iam attach-role-policy --role-name golframe-ecs-infrastructure-role \
-  --policy-arn arn:aws:iam::aws:policy/AmazonECSInfrastructureRoleforExpressGatewayServices
-```
+1. **IAM → Roles → Create role**.
+2. Trusted entity type: **Custom trust policy**. Paste:
+   ```json
+   {
+     "Version": "2012-10-17",
+     "Statement": [
+       {"Effect": "Allow", "Principal": {"Service": "ecs-tasks.amazonaws.com"}, "Action": "sts:AssumeRole"}
+     ]
+   }
+   ```
+3. **Next** → in the permissions search box type `AmazonECSTaskExecutionRolePolicy` → check it →
+   **Next**.
+4. Role name: `golframe-ecs-execution-role` → **Create role**.
+5. Click into the role and copy its **ARN** (top of the page) — you'll need it in step 6.
 
-**c) Task role** (this is the app-specific one — what `blob.py` actually runs as, giving it S3
-access with no access keys anywhere):
-```bash
-aws iam create-role --role-name golframe-task-role \
-  --assume-role-policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"ecs-tasks.amazonaws.com"},"Action":"sts:AssumeRole"}]}'
+### b) Infrastructure role
+Express-Mode-specific — lets ECS provision the load balancer, security groups, SSL cert, and
+autoscaling on your behalf.
 
-cat > /tmp/golframe-s3-policy.json <<'EOF'
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:ListBucket"],
-      "Resource": [
-        "arn:aws:s3:::golframe-yourname-videos",
-        "arn:aws:s3:::golframe-yourname-videos/*"
-      ]
-    }
-  ]
-}
-EOF
-aws iam put-role-policy --role-name golframe-task-role \
-  --policy-name golframe-s3-access --policy-document file:///tmp/golframe-s3-policy.json
-```
+1. **IAM → Roles → Create role** → Trusted entity type: **Custom trust policy**. Paste:
+   ```json
+   {
+     "Version": "2012-10-17",
+     "Statement": [
+       {"Effect": "Allow", "Principal": {"Service": "ecs.amazonaws.com"}, "Action": "sts:AssumeRole"}
+     ]
+   }
+   ```
+2. **Next** → search for `AmazonECSInfrastructureRoleforExpressGatewayServices` → check it →
+   **Next**.
+3. Role name: `golframe-ecs-infrastructure-role` → **Create role**. Copy its **ARN**.
 
-**d) GitHub Actions deploy role** (lets the GitHub Actions workflow push to ECR and update the ECS
-service — no long-lived AWS keys stored as GitHub secrets, it authenticates via OpenID Connect):
+### c) Task role (app-specific — S3 access)
+This is what `blob.py` actually runs as, giving it S3 access with no access keys anywhere.
 
-First, register GitHub as an OIDC identity provider (skip this if your account already has one —
-check IAM → Identity providers first):
-```bash
-aws iam create-open-id-connect-provider \
-  --url https://token.actions.githubusercontent.com \
-  --client-id-list sts.amazonaws.com \
-  --thumbprint-list 6938fd4d98bab03faadb97b34396831e3780aea1
-```
+1. First create the permissions policy: **IAM → Policies → Create policy** → **JSON** tab → paste
+   (swap in your actual bucket name):
+   ```json
+   {
+     "Version": "2012-10-17",
+     "Statement": [
+       {
+         "Effect": "Allow",
+         "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:ListBucket"],
+         "Resource": [
+           "arn:aws:s3:::golframe-yourname-videos",
+           "arn:aws:s3:::golframe-yourname-videos/*"
+         ]
+       }
+     ]
+   }
+   ```
+   Name it `golframe-s3-access` → **Create policy**.
+2. **IAM → Roles → Create role** → Trusted entity type: **Custom trust policy**. Paste:
+   ```json
+   {
+     "Version": "2012-10-17",
+     "Statement": [
+       {"Effect": "Allow", "Principal": {"Service": "ecs-tasks.amazonaws.com"}, "Action": "sts:AssumeRole"}
+     ]
+   }
+   ```
+3. **Next** → search for `golframe-s3-access` (the policy you just made) → check it → **Next**.
+4. Role name: `golframe-task-role` → **Create role**. Copy its **ARN**.
 
-Then create the role (replace `<ACCOUNT_ID>` with your actual AWS account ID):
-```bash
-cat > /tmp/golframe-gha-trust.json <<'EOF'
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Principal": {"Federated": "arn:aws:iam::<ACCOUNT_ID>:oidc-provider/token.actions.githubusercontent.com"},
-      "Action": "sts:AssumeRoleWithWebIdentity",
-      "Condition": {
-        "StringEquals": {"token.actions.githubusercontent.com:aud": "sts.amazonaws.com"},
-        "StringLike": {"token.actions.githubusercontent.com:sub": "repo:ajcachiaras/golFrame:ref:refs/heads/main"}
-      }
-    }
-  ]
-}
-EOF
-aws iam create-role --role-name golframe-github-actions-role \
-  --assume-role-policy-document file:///tmp/golframe-gha-trust.json
+### d) GitHub Actions deploy role
+Lets the GitHub Actions workflow push to ECR and update the ECS service — no long-lived AWS keys
+stored as GitHub secrets, it authenticates via OpenID Connect (OIDC) instead.
 
-cat > /tmp/golframe-gha-policy.json <<'EOF'
+**First, register GitHub as an identity provider** (skip if your account already has one — check
+**IAM → Identity providers** first):
+1. **IAM → Identity providers → Add provider**.
+2. Provider type: **OpenID Connect**.
+3. Provider URL: `https://token.actions.githubusercontent.com` → click **Get thumbprint**.
+4. Audience: `sts.amazonaws.com`.
+5. **Add provider**.
+
+**Then create the deploy permissions policy**: **IAM → Policies → Create policy** → **JSON** tab
+→ paste (replace `<REGION>` and `<ACCOUNT_ID>` with your actual values):
+```json
 {
   "Version": "2012-10-17",
   "Statement": [
@@ -156,54 +166,72 @@ cat > /tmp/golframe-gha-policy.json <<'EOF'
     }
   ]
 }
-EOF
-aws iam put-role-policy --role-name golframe-github-actions-role \
-  --policy-name golframe-deploy-access --policy-document file:///tmp/golframe-gha-policy.json
 ```
+Name it `golframe-deploy-access` → **Create policy**.
 
-Note the ARN printed for `golframe-github-actions-role` — you'll paste it into the GitHub Actions
-workflow file in step 6.
+**Then create the role**: **IAM → Roles → Create role** → Trusted entity type: **Custom trust
+policy** (this gives full control over the repo/branch restriction below, which the "Web identity"
+wizard option doesn't expose directly). Paste (replace `<ACCOUNT_ID>`):
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {"Federated": "arn:aws:iam::<ACCOUNT_ID>:oidc-provider/token.actions.githubusercontent.com"},
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": {"token.actions.githubusercontent.com:aud": "sts.amazonaws.com"},
+        "StringLike": {"token.actions.githubusercontent.com:sub": "repo:ajcachiaras/golFrame:ref:refs/heads/main"}
+      }
+    }
+  ]
+}
+```
+**Next** → search for `golframe-deploy-access` → check it → **Next** → name it
+`golframe-github-actions-role` → **Create role**. Copy its **ARN** — you'll paste it into GitHub
+in step 6.
 
 ## 4. Networking note (RDS reachability)
 
 By default, an Express Mode service runs in your account's default VPC and a public subnet. Two
 options, same tradeoff as any AWS setup like this:
 
-- **Simple**: RDS publicly accessible (step 2) → add an inbound rule on the RDS security group
-  allowing port 5432 from `0.0.0.0/0`. Combined with a strong DB password, a reasonable tradeoff for
-  a personal project.
+- **Simple**: RDS publicly accessible (step 2) → in the RDS console, click into the instance's
+  security group → **Edit inbound rules** → add a rule allowing port 5432 from `0.0.0.0/0`.
+  Combined with a strong DB password, a reasonable tradeoff for a personal project.
 - **Locked down**: keep RDS private, and pass `subnets`/`security-groups` inputs to the deploy
   action (step 6) pointing at the same VPC as RDS, with a security group that allows reaching RDS on
   5432. A bit more setup, no public DB exposure.
 
 ## 5. Create the ECR repository
 
-```bash
-aws ecr create-repository --repository-name golframe --region us-east-1
-```
+1. **AWS Console → ECR → Repositories → Create repository**.
+2. Visibility: **Private**. Name: `golframe`.
+3. Everything else default → **Create repository**.
 
 ## 6. Set up the GitHub Actions workflow
 
-The workflow file is already in the repo at `.github/workflows/deploy.yml`. You need to:
+The workflow file is already in the repo at `.github/workflows/deploy.yml` and doesn't need any
+edits — the region/cluster/service names in it already match this doc. You just need to add
+secrets so it has something to deploy with:
 
-1. Edit it and fill in the four placeholders at the top (`AWS_REGION`, `AWS_ACCOUNT_ID`, and the two
-   role ARNs aren't placeholders — they're read from GitHub secrets, see next step — but double
-   check the `region`/`cluster`/`service-name` values match what you used above).
-2. In the GitHub repo → **Settings → Secrets and variables → Actions**, add these repository
-   secrets:
-   - `AWS_DEPLOY_ROLE_ARN` — the `golframe-github-actions-role` ARN from step 3d
-   - `AWS_EXECUTION_ROLE_ARN` — the `golframe-ecs-execution-role` ARN from step 3a
-   - `AWS_INFRASTRUCTURE_ROLE_ARN` — the `golframe-ecs-infrastructure-role` ARN from step 3b
-   - `AWS_TASK_ROLE_ARN` — the `golframe-task-role` ARN from step 3c
-   - `ROBOFLOW_API_KEY` — your existing key
-   - `DATABASE_URL` — the connection string from step 2
-   - `S3_BUCKET_NAME` — your bucket name from step 1
-   - `BASIC_AUTH_USER` / `BASIC_AUTH_PASS` — pick a real username/password; this is the only thing
-     standing between the public internet and your swing library.
-3. Commit and push to `main`. The workflow runs automatically, builds the image, pushes it to ECR,
-   and creates the Express service on its first run (updates it on every run after that).
-4. Watch the run under the repo's **Actions** tab. The last step's output includes the service's
-   public endpoint URL once it succeeds.
+In the GitHub repo → **Settings → Secrets and variables → Actions**, add these repository secrets:
+- `AWS_DEPLOY_ROLE_ARN` — the `golframe-github-actions-role` ARN from step 3d
+- `AWS_EXECUTION_ROLE_ARN` — the `golframe-ecs-execution-role` ARN from step 3a
+- `AWS_INFRASTRUCTURE_ROLE_ARN` — the `golframe-ecs-infrastructure-role` ARN from step 3b
+- `AWS_TASK_ROLE_ARN` — the `golframe-task-role` ARN from step 3c
+- `ROBOFLOW_API_KEY` — your existing key
+- `DATABASE_URL` — the connection string from step 2
+- `S3_BUCKET_NAME` — your bucket name from step 1
+- `BASIC_AUTH_USER` / `BASIC_AUTH_PASS` — pick a real username/password; this is the only thing
+  standing between the public internet and your swing library.
+
+Then either push any commit to `main`, or go to the repo's **Actions** tab → select the "Deploy to
+ECS Express Mode" workflow → **Run workflow** to trigger it manually the first time. It builds the
+image, pushes it to ECR, and creates the Express service on its first run (updates it on every run
+after that). Watch the run under the **Actions** tab — the last step's output includes the
+service's public endpoint URL once it succeeds.
 
 ## 7. First real check
 
@@ -213,6 +241,6 @@ log first (build/push failures show up there), then the ECS service's **Logs** t
 Console (CloudWatch) for anything that fails after the container starts — that's the same
 stdout/stderr you'd see running `uvicorn` locally.
 
-Since ECS Express Mode is a very new AWS feature (introduced in early 2026), some console/CLI
-details here might shift slightly from what's documented above — share whatever error you hit and
+Since ECS Express Mode is a very new AWS feature (introduced in early 2026), some console details
+here might shift slightly from what's documented above — share whatever error/screen you hit and
 I'll help work through it.
