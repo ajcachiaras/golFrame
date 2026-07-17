@@ -5,7 +5,7 @@ import shutil
 import tempfile
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
@@ -28,9 +28,14 @@ from .schemas import (
 _security = HTTPBasic(auto_error=False)
 
 
-def require_auth(credentials: HTTPBasicCredentials | None = Depends(_security)) -> None:
+def require_auth(
+    request: Request, credentials: HTTPBasicCredentials | None = Depends(_security)
+) -> None:
     """No-op when BASIC_AUTH_USER/PASS aren't set (local dev); gates every
-    route when they are (a public deploy for a single-user tool)."""
+    route when they are (a public deploy for a single-user tool), except
+    /api/health which the load balancer polls unauthenticated."""
+    if request.url.path == "/api/health":
+        return
     user = os.environ.get("BASIC_AUTH_USER")
     password = os.environ.get("BASIC_AUTH_PASS")
     if not user or not password:

@@ -215,6 +215,19 @@ options, same tradeoff as any AWS setup like this:
 The deploy action creates/updates the Express *service* on each run, but expects the *cluster* to
 already exist — it won't create one for you.
 
+> **First time using ECS in this account?** Cluster creation can fail with `Unable to assume the
+> service linked role. Please verify that the ECS service linked role exists.` ECS needs the
+> `AWSServiceRoleForECS` service-linked role to exist before it can create anything, and that role
+> is normally auto-created on first use but occasionally doesn't fire. If you hit this, open
+> **CloudShell** (the `>_` icon in the AWS Console's top nav — a browser terminal with the AWS CLI
+> already authenticated, no local install needed) and run:
+> ```
+> aws iam create-service-linked-role --aws-service-name ecs.amazonaws.com
+> ```
+> then retry cluster creation below. The same fix applies if you later see this error for
+> `elasticloadbalancing.amazonaws.com` or `ecs.application-autoscaling.amazonaws.com` during the
+> Express service deploy — just swap the service name in the command.
+
 1. **AWS Console → ECS → Clusters → Create cluster**.
 2. Cluster name: `golframe` (must match exactly — this is what the workflow's `ECS_CLUSTER` env var
    passes in).
