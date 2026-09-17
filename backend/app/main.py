@@ -64,6 +64,12 @@ SAFE_EXT_RE = re.compile(r"^\.[a-zA-Z0-9]{1,5}$")
 @app.on_event("startup")
 def on_startup() -> None:
     storage.init_db()
+    if not os.environ.get("ROBOFLOW_API_KEY"):
+        print(
+            "WARNING: ROBOFLOW_API_KEY is not set -- club tracking is disabled and swings "
+            "will process with pose data only. This fails silently per-swing otherwise, "
+            "since club tracking is intentionally best-effort/non-fatal."
+        )
 
 
 def _swing_to_dict(swing: dict) -> dict:

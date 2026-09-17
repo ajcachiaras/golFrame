@@ -13,6 +13,12 @@ TORSO_HEIGHT_TARGET_FRACTION = 0.16  # fraction of TARGET_HEIGHT
 MIN_TORSO_HEIGHT_FRACTION_OF_RAW = 0.05  # sanity floor vs. raw_height
 TORSO_CENTER_Y_FRACTION = 0.48  # where to place the torso vertically in the output canvas
 MIN_LEG_CONF = 0.3
+# Below this, treat the measured leg-line tilt as ordinary perspective/stance
+# foreshortening rather than genuine camera roll -- observed real footage
+# shows a consistent few-degree "tilt" from a level camera purely from normal
+# filming angles, which correcting for it just adds as an artificial rotation.
+# A truly tilted phone/tripod shot reads well above this.
+MIN_ROTATION_CORRECTION_DEG = 10.0
 
 
 def compute_transform(
@@ -56,7 +62,9 @@ def compute_transform(
         # (0, +y). Same derivation as the spine-vertical case: zeroes out the
         # vector's x-component after rotation.
         leg_vec = ankle_mid - hip_mid
-        rotation_deg = float(np.degrees(np.arctan2(-leg_vec[0], leg_vec[1])))
+        measured_deg = float(np.degrees(np.arctan2(-leg_vec[0], leg_vec[1])))
+        if abs(measured_deg) >= MIN_ROTATION_CORRECTION_DEG:
+            rotation_deg = measured_deg
 
     torso_height = float(np.linalg.norm(hip_mid - shoulder_mid))
     min_torso_height = raw_height * MIN_TORSO_HEIGHT_FRACTION_OF_RAW
