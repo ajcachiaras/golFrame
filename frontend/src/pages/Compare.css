@@ -50,3 +50,35 @@
     grid-template-columns: 1fr;
   }
 }
+
+.playback-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.speed-control,
+.step-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 12px;
+}
+
+.speed-control button,
+.step-control button {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--text-h);
+}
+
+.speed-control button.active {
+  border-color: var(--accent);
+  color: var(--accent);
+}

@@ -12,12 +12,16 @@ import CameraCaveat from '../components/CameraCaveat'
 import MetricsTable from '../components/MetricsTable'
 import './Compare.css'
 
+const PLAYBACK_RATES = [0.1, 0.25, 0.5, 1, 1.5, 2]
+const FRAME_STEP_FRACTION = 0.05
+
 export default function Compare() {
   const [swings, setSwings] = useState<SwingSummary[]>([])
   const [idA, setIdA] = useState('')
   const [idB, setIdB] = useState('')
   const [result, setResult] = useState<CompareResponse | null>(null)
   const [syncPoint, setSyncPoint] = useState<KeyframeName>('impact')
+  const [playbackRate, setPlaybackRate] = useState(1)
   const [error, setError] = useState<string | null>(null)
   const videoA = useRef<HTMLVideoElement>(null)
   const videoB = useRef<HTMLVideoElement>(null)
@@ -62,6 +66,44 @@ export default function Compare() {
     videoB.current?.play()
   }
 
+  function pauseBoth() {
+    videoA.current?.pause()
+    videoB.current?.pause()
+  }
+
+  function changeSpeed(rate: number) {
+    setPlaybackRate(rate)
+    if (videoA.current) videoA.current.playbackRate = rate
+    if (videoB.current) videoB.current.playbackRate = rate
+  }
+
+  function stepVideoByFrames(
+    video: HTMLVideoElement | null,
+    fps: number | null | undefined,
+    frames: number,
+    direction: 1 | -1
+  ) {
+    if (!video || !fps) return
+    video.pause()
+    const stepSeconds = frames / fps
+    const max = video.duration || Infinity
+    video.currentTime = Math.min(Math.max(0, video.currentTime + direction * stepSeconds), max)
+  }
+
+  function stepBothByFrames(frames: number, direction: 1 | -1) {
+    stepVideoByFrames(videoA.current, result?.a.fps, frames, direction)
+    stepVideoByFrames(videoB.current, result?.b.fps, frames, direction)
+  }
+
+  function stepBothPercent(direction: 1 | -1) {
+    // Each side steps by its own frame_count * FRAME_STEP_FRACTION, since A/B
+    // can have different lengths/fps -- mirrors the single-swing detail view.
+    const framesA = Math.max(1, Math.round((result?.a.frame_count ?? 1) * FRAME_STEP_FRACTION))
+    const framesB = Math.max(1, Math.round((result?.b.frame_count ?? 1) * FRAME_STEP_FRACTION))
+    stepVideoByFrames(videoA.current, result?.a.fps, framesA, direction)
+    stepVideoByFrames(videoB.current, result?.b.fps, framesB, direction)
+  }
+
   return (
     <div>
       <h1 style={{ marginTop: 0 }}>Compare swings</h1>
@@ -103,6 +145,26 @@ export default function Compare() {
               </button>
             ))}
             <button onClick={playBoth}>▶ Play both</button>
+            <button onClick={pauseBoth}>⏸ Pause both</button>
+          </div>
+
+          <div className="playback-controls">
+            <div className="speed-control">
+              <span>Speed:</span>
+              {PLAYBACK_RATES.map((rate) => (
+                <button key={rate} className={playbackRate === rate ? 'active' : ''} onClick={() => changeSpeed(rate)}>
+                  {rate}x
+                </button>
+              ))}
+            </div>
+            <div className="step-control">
+              <button onClick={() => stepBothByFrames(1, -1)}>◀ -1 frame</button>
+              <button onClick={() => stepBothByFrames(1, 1)}>+1 frame ▶</button>
+            </div>
+            <div className="step-control">
+              <button onClick={() => stepBothPercent(-1)}>◀◀ -5%</button>
+              <button onClick={() => stepBothPercent(1)}>+5% ▶▶</button>
+            </div>
           </div>
 
           <div className="compare-videos">
