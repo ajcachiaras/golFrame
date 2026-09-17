@@ -1,8 +1,9 @@
 name: Deploy to ECS Express Mode
 
+# Auto-deploy-on-push disabled: the app moved back to running locally, so
+# this workflow would otherwise fail against AWS infrastructure that no
+# longer exists. Re-enable the push trigger if you deploy to AWS again.
 on:
-  push:
-    branches: [main]
   workflow_dispatch: {}
 
 env:

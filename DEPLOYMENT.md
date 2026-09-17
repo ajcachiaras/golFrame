@@ -258,6 +258,15 @@ image, pushes it to ECR, and creates the Express service on its first run (updat
 after that). Watch the run under the **Actions** tab — the last step's output includes the
 service's public endpoint URL once it succeeds.
 
+> **Use that endpoint URL, not the raw ALB DNS name.** Express Mode fronts your service with a
+> shared gateway ALB (visible in **EC2 → Load Balancers**, something like
+> `ecs-express-gateway-alb-...elb.amazonaws.com`) that only has an **HTTPS (443)** listener, no
+> HTTP. It also routes by hostname (SNI/Host header) to a separate, auto-generated per-service
+> domain shaped like `https://go-<hash>.ecs.<region>.on.aws` — hitting the bare ALB DNS name over
+> HTTPS gets you a `404` straight from the load balancer (`server: awselb/2.0`) since it doesn't
+> match any routing rule. The Actions log output and **ECS → Clusters → golframe → Services →
+> golframe** in the console both show the correct `on.aws` URL to actually use.
+
 ## 8. First real check
 
 Once deployed: open the endpoint URL from the Actions log, log in with the Basic Auth credentials
